@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Attendance</title>
+  </head>
+  <body>
+    <h1>Attendance Report</h1>
+    <table border="1" cellpadding="6">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>First IN</th>
+          <th>Last OUT</th>
+          <th>Late?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in records %}
+        <tr>
+          <td>{{ row.full_name }}</td>
+          <td>{{ row.first_in }}</td>
+          <td>{{ row.last_out }}</td>
+          <td>{{ row.is_late }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
