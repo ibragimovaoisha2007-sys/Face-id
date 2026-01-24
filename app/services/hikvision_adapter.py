@@ -1,36 +1,39 @@
-from dataclasses import dataclass
 from datetime import datetime
 
+class GenericHikvisionAdapter:
+    def normalize(self, payload: dict):
+        # Hikvision kamerasi formati
+        event = payload.get("AccessControllerEvent", {})
+        
+        # Generatoringdan keladigan kalitlarni ham, kameranikini ham tekshiramiz
+        # Muhimi: Har doim biror qiymat qaytishini ta'minlaymiz
+        t_id = (payload.get("terminalUserId") or 
+                event.get("employeeNoString") or 
+                event.get("employeeNo") or 
+                "0000")
+        
+        d_id = (payload.get("deviceId") or 
+                payload.get("dateTime") or 
+                "UNKNOWN-DEVICE")
+        
+        # generator 'eventType' (T katta), adapter esa 'eventType' yoki 'event_type' qidiradi
+        e_type = (payload.get("eventType") or 
+                  event.get("eventType") or 
+                  "IN")
+        
+        e_time = (payload.get("timestamp") or 
+                  event.get("dateTime") or 
+                  datetime.now().isoformat())
 
-@dataclass
-class NormalizedEvent:
-    terminal_user_id: str | None
-    event_time: datetime
-    device_id: str
-    event_type: str
-    source_event_id: str
-    raw_payload: dict
+        s_id = (payload.get("sourceEventId") or 
+                event.get("eventLogID") or 
+                "0")
 
-
-class HikvisionEventAdapter:
-    """
-    Adapter layer for different Hikvision payload formats.
-
-    Map any payload to NormalizedEvent.
-    """
-
-    def normalize(self, payload: dict) -> NormalizedEvent:
-        raise NotImplementedError
-
-
-class GenericHikvisionAdapter(HikvisionEventAdapter):
-    def normalize(self, payload: dict) -> NormalizedEvent:
-        return NormalizedEvent(
-            terminal_user_id=payload.get("terminalUserId")
-            or payload.get("employeeNo"),
-            event_time=datetime.fromisoformat(payload["timestamp"]),
-            device_id=payload.get("deviceId", "unknown"),
-            event_type=payload.get("eventType", "IN"),
-            source_event_id=payload.get("sourceEventId", payload.get("eventId", "")),
-            raw_payload=payload,
-        )
+        return type("NormalizedEvent", (), {
+            "device_id": str(d_id),
+            "terminal_user_id": str(t_id),
+            "event_type": str(e_type),
+            "event_time": e_time,
+            "source_event_id": str(s_id),
+            "raw_payload": payload
+        })

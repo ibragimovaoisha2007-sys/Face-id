@@ -1,50 +1,82 @@
 import json
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
-from app import crud, models
+import asyncio
+from datetime import datetime
+from fastapi import APIRouter, Request
+from app import models
+from app.db import SessionLocal
 from app.config import settings
-from app.db import get_db
 from app.services.hikvision_adapter import GenericHikvisionAdapter
+from app.telegram_bot import bot 
 
 router = APIRouter(prefix="/hikvision", tags=["hikvision"])
 
-
 @router.post("/event-receiver")
-async def event_receiver(
-    request: Request,
-    db: Session = Depends(get_db),
-    x_device_token: str | None = Header(default=None),
-):
-    if x_device_token and x_device_token != settings.hikvision_event_token:
-        raise HTTPException(status_code=403, detail="Invalid device token")
-
+async def event_receiver(request: Request):
     payload = await request.json()
-    adapter = GenericHikvisionAdapter()
-    normalized = adapter.normalize(payload)
+    asyncio.create_task(process_event(payload))
+    return {"status": "received"}
 
-    device = crud.get_device_by_device_id(db, normalized.device_id)
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not registered")
-
-    student = None
-    if normalized.terminal_user_id:
-        student = crud.get_student_by_terminal_id(db, normalized.terminal_user_id)
-
-    log = models.AttendanceLog(
-        student_id=student.id if student else None,
-        device_id=device.id,
-        event_type=normalized.event_type,
-        event_time=normalized.event_time,
-        source_event_id=normalized.source_event_id,
-        raw_payload=json.dumps(normalized.raw_payload),
-    )
-
+async def process_event(payload):
+    db = SessionLocal()
     try:
-        crud.create_attendance_log(db, log)
-    except IntegrityError:
-        db.rollback()
-        return {"status": "duplicate"}
+        adapter = GenericHikvisionAdapter()
+        normalized = adapter.normalize(payload)
 
-    return {"status": "ok"}
+        # 1. Qurilmani tekshirish
+        device_id = str(normalized.device_id) if normalized.device_id else "UNKNOWN-DEV"
+        device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+        
+        if not device:
+            device = models.Device(
+                device_id=device_id, 
+                name="Auto Device", 
+                ip_address="127.0.0.1",
+                location="Main Gate",
+                is_active=True
+            )
+            db.add(device)
+            db.commit()
+            db.refresh(device)
+
+        # 2. O'quvchini qidirish
+        student_id_str = str(normalized.terminal_user_id)
+        # O'quvchini ota-onalari bilan birga yuklaymiz (relationship orqali)
+        student = db.query(models.Student).filter(models.Student.terminal_user_id == student_id_str).first()
+
+        # 3. Log yozish
+        log = models.AttendanceLog(
+            student_id=student.id if student else None,
+            device_id=device.id,
+            event_type=getattr(normalized, 'event_type', 'ACCESS') or 'ACCESS',
+            event_time=getattr(normalized, 'event_time', datetime.now()),
+            source_event_id=str(getattr(normalized, 'source_event_id', '0')),
+            raw_payload=json.dumps(payload)
+        )
+        db.add(log)
+        db.commit()
+
+        # 4. Telegram xabar (Ota-onaga yuborish qismi)
+        if student:
+            # O'quvchiga biriktirilgan ota-onalarni topish
+            student_parents = db.query(models.StudentParent).filter(models.StudentParent.student_id == student.id).all()
+            
+            status_text = "maktabga keldi ✅" if "IN" in log.event_type.upper() else "maktabdan ketdi 🏠"
+            msg = f"🔔 **Davomat xabari**\n\nFarzandingiz **{student.full_name}** hozirgina {status_text}."
+
+            for link in student_parents:
+                parent = db.query(models.Parent).get(link.parent_id)
+                if parent and parent.telegram_chat_id:
+                    try:
+                        await bot.send_message(chat_id=parent.telegram_chat_id, text=msg, parse_mode="Markdown")
+                    except Exception as tg_e:
+                        print(f"Telegram yuborishda xato (ChatID: {parent.telegram_chat_id}): {tg_e}")
+        
+        # Admin uchun log (ixtiyoriy)
+        elif settings.telegram_admin_chat_id:
+             await bot.send_message(chat_id=settings.telegram_admin_chat_id, text=f"❓ Noma'lum ID ({student_id_str}) terminalda ko'rindi.")
+
+    except Exception as e:
+        print(f"ISHLOV BERISHDA XATO: {str(e)}")
+        db.rollback()
+    finally:
+        db.close()

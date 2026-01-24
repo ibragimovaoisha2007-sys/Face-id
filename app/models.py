@@ -1,10 +1,8 @@
 from datetime import datetime
-
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-
 
 class ClassRoom(Base):
     __tablename__ = "classes"
@@ -34,7 +32,8 @@ class Parent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     full_name: Mapped[str] = mapped_column(String(128), nullable=False)
     phone: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    telegram_chat_id: Mapped[int | None] = mapped_column(Integer)
+    # MANA SHU YER BIGINTEGER BO'LDI:
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger)
     link_code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
 
     students = relationship("StudentParent", back_populates="parent")

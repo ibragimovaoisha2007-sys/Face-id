@@ -1,5 +1,4 @@
 from datetime import date
-
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,9 +6,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db import get_db
+from app.db import get_db, engine
+from app import models
 from app.routers import attendance, devices, hikvision, students, sync
 from app.services.attendance import build_daily_report
+
+# Bu qator bazada students va boshqa jadvallarni yaratadi
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.app_name)
 
@@ -23,14 +26,12 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
-
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
         {"request": request, "title": settings.app_name},
     )
-
 
 @app.get("/admin/attendance", response_class=HTMLResponse)
 def admin_attendance(
@@ -44,3 +45,5 @@ def admin_attendance(
         "attendance.html",
         {"request": request, "records": report},
     )
+ 
+ 
