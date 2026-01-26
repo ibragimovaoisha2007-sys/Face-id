@@ -19,13 +19,41 @@ def import_students():
             
             student = Student(
                 full_name=full_name_str, 
-                terminal_user_id=t_id, 
+                terminal_user_id=4, 
                 is_active=True
             )
             db.add(student)
             db.flush()
             
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            code = ''.join(random.chimport cv2
+import os
+
+def register_face():
+    if not os.path.exists("data/faces"):
+        os.makedirs("data/faces")
+
+    u_id = input("ID kiriting (masalan 120): ")
+    cap = cv2.VideoCapture(0) # Agar ochilmasa 0 ni 1 qilib ko'ring
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Kamera topilmadi!")
+            break
+            
+        cv2.imshow('Kamera (Rasmga olish uchun S ni bosing)', frame)
+        
+        if cv2.waitKey(1) & 0xFF == ord('s'):
+            cv2.imwrite(f"data/faces/user_{u_id}.jpg", frame)
+            print(f"✅ Rasm saqlandi: user_{u_id}.jpg")
+            break
+        elif cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+register_face()oices(string.ascii_uppercase + string.digits, k=8))
             parent = Parent(
                 full_name=f"{full_name_str} ota-onasi", 
                 link_code=code,

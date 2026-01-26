@@ -1,45 +1,54 @@
 import pandas as pd
-import sys
-import os
-
-# Loyiha ildizini Python yo'liga qo'shamiz
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(BASE_DIR)
-
+import random
+import string
 from app.db import SessionLocal
-from app.models import Student
+from app.models import Student, Parent, StudentParent
 
-def start_import():
+def import_students():
     db = SessionLocal()
-    file_path = os.path.join(BASE_DIR, "app", "static", "students.xlsx")
-    
-    if not os.path.exists(file_path):
-        print(f"❌ Xato: {file_path} topilmadi!")
+    try:
+        df = pd.read_excel("app/static/students.xlsx")
+        df.columns = [c.strip() for c in df.columns] 
+    except Exception as e:
+        print(f"❌ Xato: Excelni o'qib bo'lmadi: {e}")
         return
 
-    try:
-        df = pd.read_excel(file_path, engine='openpyxl')
-        df.columns = [c.strip() for c in df.columns] 
-        
-        count = 0
-        for _, row in df.iterrows():
-            # Modelga moslab Ism va Familiyani birlashtiramiz
-            full_name_str = f"{row['Ism']} {row['Familiya']}"
+    for index, row in df.iterrows():
+        try:
+            # Excelingizdagi ustun nomlari ishlatildi
+            full_name_str = str(row['oquvchi_ismi']) 
+            t_id = str(row['terminal_id'])
             
             student = Student(
-                terminal_user_id=str(row['ID']),
-                full_name=full_name_str,  # Models.py dagi ustun nomi
+                full_name=full_name_str, 
+                terminal_user_id=t_id, 
                 is_active=True
             )
-            db.merge(student)
-            count += 1
-        
-        db.commit()
-        print(f"✅ Tayyor! {count} ta o'quvchi bazaga kiritildi.")
-    except Exception as e:
-        print(f"❌ Xato berdi: {e}")
-    finally:
-        db.close()
+            db.add(student)
+            db.flush()
+            
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            parent = Parent(
+                full_name=f"{full_name_str} ota-onasi", 
+                link_code=code,
+                phone=str(row['phone']), 
+                telegram_chat_id=None
+            )
+            db.add(parent)
+            db.flush()
+            
+            sp = StudentParent(student_id=student.id, parent_id=parent.id)
+            db.add(sp)
+            print(f"✅ Qo'shildi: {full_name_str} | ID: {t_id} | Kod: {code}")
+            
+        except Exception as e:
+            print(f"❌ Xato yuz berdi: {e}")
+            db.rollback()
+            continue
+
+    db.commit()
+    db.close()
+    print("\n🚀 Barcha o'quvchilar muvaffaqiyatli saqlandi!")
 
 if __name__ == "__main__":
-    start_import()
+    import_students()

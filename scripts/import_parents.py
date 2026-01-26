@@ -12,13 +12,13 @@ from app.models import Parent, Student, StudentParent
 def start_import():
     db = SessionLocal()
     
-    # MANA SHU YERGA OTA-ONALARNI RO'YXATINI YOZASIZ
-    # Bola_ID - bu o'sha boyagi Exceldagi (1001, 1002...) raqamlar
+    # Faqat sizning ma'lumotlaringiz qoldi
     parents_data = [
-        {"name": "Alimov Bahodir", "phone": "998901234567", "student_terminal_id": "1001"},
-        {"name": "Baxtiyorova Guli", "phone": "998912223344", "student_terminal_id": "1002"},
-        {"name": "Sizning Ismingiz", "phone": "998991234567", "student_terminal_id": "1003"},
-        # Shu yerga xohlagancha odam qo'shishingiz mumkin
+        {
+            "name": "Oishaning Dadasi", 
+            "phone": "998901234567",    
+            "student_terminal_id": "40" # Kameradagi Employee ID
+        },
     ]
 
     try:
